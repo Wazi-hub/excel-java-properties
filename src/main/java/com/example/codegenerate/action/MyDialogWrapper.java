@@ -138,6 +138,6 @@ public class MyDialogWrapper extends DialogWrapper {
     }
 
     public void hintError() {
-        textArea.setText("ops!!!, try again or please text xianlin for debug~~~~");
+        textArea.setText("ops!!!, try again or please text author for debug~~~~");
     }
 }
