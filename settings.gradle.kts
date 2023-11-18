@@ -1,1 +1,1 @@
-rootProject.name = "excel2Properties"
+rootProject.name = "excel-java-properties"
