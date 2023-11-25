@@ -5,13 +5,16 @@ import com.intellij.openapi.editor.CaretModel;
 import com.intellij.openapi.editor.Document;
 import com.intellij.openapi.editor.Editor;
 import com.intellij.openapi.ui.DialogWrapper;
+import org.jetbrains.annotations.NotNull;
 
 import javax.swing.*;
 import java.awt.*;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 public class MyDialogWrapper extends DialogWrapper {
     private final ArrayList<JCheckBox> checkBoxPanels = new ArrayList<>();
@@ -59,13 +62,13 @@ public class MyDialogWrapper extends DialogWrapper {
 
 
         reverse.addActionListener(e -> {
-            reverseCheckPanel(checkPanel, button,reverse);
+            reverseCheckPanel(checkPanel, button, reverse);
         });
         button.addActionListener(e -> {
-            rotateCheckPanel(checkPanel, button,reverse);
+            rotateCheckPanel(checkPanel, button, reverse);
         });
 
-        rotateCheckPanel(checkPanel, button,reverse);
+        rotateCheckPanel(checkPanel, button, reverse);
         panel.add(checkPanel);
         panel.add(new JScrollPane(textArea));
         return panel;
@@ -93,27 +96,17 @@ public class MyDialogWrapper extends DialogWrapper {
     }
 
     @Override
-    protected void doOKAction(){
+    protected void doOKAction() {
         if (textArea.getText() != null && !textArea.getText().isEmpty()) {
             StringBuilder sb = new StringBuilder();
             try {
                 String[] lines = textArea.getText().split("\n");
                 java.util.List<Map<String, String>> contentMap = new ArrayList<>();
+                List<JCheckBox> selectBox = checkBoxPanels.stream().filter(JCheckBox::isSelected).collect(Collectors.toList());
                 for (String line : lines) {
-                    String[] parts = line.trim().split("\\s+");
-                    int partsIndex = 0;
-                    Map<String, String> map = new HashMap<>();
-                    for (JCheckBox checkBox : checkBoxPanels) {
-                        if (checkBox.isSelected()) {
-                            map.put(checkBox.getText(), parts[partsIndex]);
-                            partsIndex++;
-                        } else if (checkBox.getText() == "type") {
-                            map.put(checkBox.getText(), "String");
-                        }
-                    }
+                    Map<String, String> map = lineDataAccess(line, selectBox);
                     contentMap.add(map);
                 }
-
                 for (Map<String, String> map : contentMap) {
                     if (map.containsKey("comment")) {
                         sb.append("\n\t/** \n\t *").append(map.get("comment")).append("\n\t */");
@@ -122,7 +115,7 @@ public class MyDialogWrapper extends DialogWrapper {
                 }
             } catch (Exception e1) {
                 hintError();
-                return;
+                throw e1;
             }
             if (editor != null) {
                 this.dispose();
@@ -135,6 +128,66 @@ public class MyDialogWrapper extends DialogWrapper {
             }
         }
 
+    }
+
+    @NotNull
+    private Map<String, String> lineDataAccess(String line, List<JCheckBox> selectBox) {
+        Map<String, String> map = new HashMap<>();
+
+        String[] parts = line.trim().split("\\s+");
+        if (selectBox.size() != parts.length) {
+            map.put("type", "String");
+            map.put("field", "field");
+            map.put("comment", " @todo fieldConfigProblem||||" + line);
+            return map;
+        }
+        int partsIndex = 0;
+        for (JCheckBox checkBox : selectBox) {
+            if (checkBox.isSelected()) {
+                String data = parts[partsIndex] == null ? "" : parts[partsIndex];
+                if (checkBox.getText() == "type") {
+                    data = this.typeConfig(data);
+                } else if (checkBox.getText() == "field") {
+                    data = this.fieldConfig(data);
+                }
+                map.put(checkBox.getText(), data);
+                partsIndex++;
+            } else if (checkBox.getText() == "type") {
+                map.put(checkBox.getText(), "String");
+            }
+        }
+        return map;
+    }
+
+    private String typeConfig(String param) {
+        String type = param.toLowerCase();
+        if (type.startsWith("varchar") || type.startsWith("text") || type.startsWith("json")) {
+            return "String";
+        }
+        if (type.startsWith("datetime")) {
+            return "Date";
+        }
+        if (type.startsWith("int")) {
+            return "Integer";
+        }
+        return upFirst(param);
+    }
+
+    private String fieldConfig(String param) {
+        String[] parts = param.split("_");
+        StringBuilder camelCaseString = new StringBuilder(parts[0]);
+        for(int i = 1; i < parts.length; i++) {
+            String lowerCasePart = parts[i].toLowerCase();
+            String upFirst = upFirst(lowerCasePart);
+            camelCaseString.append(upFirst);
+        }
+        return camelCaseString.toString();
+    }
+
+    private static String upFirst(String lowerCasePart) {
+        String firstLetter = lowerCasePart.substring(0, 1).toUpperCase();
+        String remainingLetters = lowerCasePart.substring(1);
+        return firstLetter + remainingLetters;
     }
 
     public void hintError() {
